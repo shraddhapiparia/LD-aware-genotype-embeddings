@@ -1,0 +1,28 @@
+# Raw/protected genotype data
+data/raw_chip/*
+!data/raw_chip/README.md
+
+# Derived block data
+data/blocks/*
+!data/blocks/README.md
+data/processed_blocks/*
+!data/processed_blocks/README.md
+
+# Results and logs
+results/
+logs/
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+*.pt
+*.pth
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
+
+# IDE / AI tooling
+.claude/
