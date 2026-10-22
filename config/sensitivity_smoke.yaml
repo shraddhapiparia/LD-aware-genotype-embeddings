@@ -1,0 +1,54 @@
+dataset:
+  raw_dir: data/GACRS/preprocessed_blocks/raw
+  block_def: metadata/sensitivity_blocks.tsv
+  use_manifest_path: false
+
+shared:
+  split_seed: 42
+  model_seeds: [42]
+  val_frac: 0.20
+  k_range: [2, 3, 4, 5, 6, 8, 10]
+  save_per_block: true
+  run_clustering: false
+
+pca:
+  output_root: results/GACRS/sensitivity/pca
+
+  # Reuse the original 464-block PCA subject split.
+  phase1_dir: results/GACRS/baseline_pca
+
+  save_per_block: true
+
+vae:
+  output_root: results/GACRS/sensitivity/smoke_vae
+  phase1_dir: results/GACRS/sensitivity/pca
+
+  loss_type: ORD
+  objective_mode: VAE
+
+  epochs: 5
+  diagnostic_interval: 1
+  batch_size: 64
+  lr: 0.001
+  dropout: 0.30
+  patience: 3
+  grad_clip: 1.0
+  checkpoint_start_epoch: 3
+
+  beta_max: 0.5
+  beta_warmup: 2
+  free_bits: 0.5
+
+  sensitivity:
+    enabled: false
+    dry_run: true
+    mode: one_at_a_time
+
+    reference:
+      beta_max: 0.5
+      free_bits: 0.5
+      objective_mode: VAE
+
+    beta_values: [0.25, 0.5, 1.0]
+    free_bits_values: [0.0, 0.25, 0.5, 1.0]
+    include_ae: true

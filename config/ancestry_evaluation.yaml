@@ -1,0 +1,68 @@
+# config/ancestry_evaluation.yaml — settings for scripts/evaluation/ancestry_evaluation.py
+#
+# Model-agnostic ancestry-signal evaluation. The same config drives
+# baseline_pca, baseline_vae, and main_model — only the `models:` section
+# differs per model. Add/remove model entries here; the script silently
+# skips any model whose embedding_file/subject_id_file don't exist yet
+# (e.g. baseline_vae / main_model before they've been run).
+#
+# All joins between embeddings, ancestry PCs, and the split are done by
+# subject ID (never by row position), EXCEPT cluster_file, which the
+# baseline scripts write with no ID column of its own -- those rows are
+# assumed to be in the same order as subject_id_file for that model (true
+# for per_block_PCA_concat.py / per_block_vae_concat.py's cluster() output).
+
+seed: 42
+output_root: results/GACRS/ancestry_evaluation
+
+# ── ancestry ground truth ──────────────────────────────────────────
+ancestry:
+  pc_file: metadata/ldpruned_997subs.eigenvec   # must exist before running; not yet generated
+  id_column: IID
+  pc_columns: [PC1, PC2, PC3, PC4, PC5, PC6, PC7, PC8, PC9, PC10]
+
+# ── shared train/test split ────────────────────────────────────────
+# Created once (from the intersection of ancestry IDs and every model
+# present at first-run time) and reused verbatim by every later run and
+# every model, so baseline_pca / baseline_vae / main_model are always
+# compared on identical held-out subjects.
+split:
+  file: results/GACRS/ancestry_evaluation/evaluation_split.csv
+  test_frac: 0.20
+
+# ── dimension-level test ───────────────────────────────────────────
+embedding_pca:
+  n_components: 10   # capped automatically at n_features / (n_train-1) if smaller
+
+# ── which evaluation components to run ─────────────────────────────
+components:
+  dimension_level: true
+  embedding_level: true
+  cluster_level: true
+
+# ── per-model file locations ────────────────────────────────────────
+# Fixed-split design (config/baseline.yaml shared.split_seed/model_seeds):
+# PCA fits ONCE into a flat output_root (no seed subdirectory). VAE runs
+# once per model_seed into <output_root>/seed_<model_seed>/. Ancestry
+# evaluation runs on a single embedding, so it points at PCA's one run and
+# VAE's model_seed=42 (the first configured model_seed) as the
+# representative one -- not the median-across-model_seed summary, which has
+# no single embedding file to evaluate.
+models:
+  baseline_pca:
+    embedding_file: results/GACRS/baseline_pca/embeddings/concat_embedding.npy
+    subject_id_file: results/GACRS/baseline_pca/subjects.csv
+    cluster_file: results/GACRS/baseline_pca/clustering/gmm_labels.csv
+    cluster_column: gmm_k4
+
+  baseline_vae:
+    embedding_file: results/GACRS/baseline_vae/ORD/beta0.5/seed_42/embeddings/concat_embedding.npy
+    subject_id_file: results/GACRS/baseline_vae/ORD/beta0.5/seed_42/subjects.csv
+    cluster_file: results/GACRS/baseline_vae/ORD/beta0.5/seed_42/clustering/gmm_labels.csv
+    cluster_column: gmm_k4
+
+  main_model:
+    embedding_file: results/GACRS/main_model/embeddings/concat_embedding.npy
+    subject_id_file: results/GACRS/main_model/subjects.csv
+    cluster_file: results/GACRS/main_model/clustering/gmm_labels.csv
+    cluster_column: gmm_k4

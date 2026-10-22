@@ -1,0 +1,90 @@
+# config/baseline_beta0_ae.yaml — AE ABLATION (beta=0) variant of settings for the per-block baseline ladder
+# (scripts/baselines/per_block_PCA_concat.py, per_block_vae_concat.py).
+#
+# Both scripts are config-driven (no experiment CLI flags): PCA merges
+# dataset + shared + `pca:`; VAE merges dataset + shared + `vae:`.
+# val_frac/k_range/split_seed/model_seeds live ONLY under `shared:` so the
+# two baselines can never drift out of fairness-comparability by having
+# separate defaults.
+#
+# Per-block latent dim is NOT set here — it is derived per block from
+# scripts/baselines/latent_rule.py, the one rule both baselines read:
+#   p<=49 -> d=2 (small), 50-199 -> d=4 (medium), p>=200 -> d=8 (large)
+# eff_haps and a fourth size class are explicitly out of scope for Phase 1
+# (deferred to Phase 2 — see docs/baselines.md).
+#
+# FIXED-SPLIT DESIGN (audited; see docs/baselines.md "Split semantics"):
+#   split_seed   -- the ONE seed used to create the train/validation split.
+#                   PCA fits EXACTLY ONCE on it. Every VAE model_seed reuses
+#                   this split byte-identically (fails loudly if it can't --
+#                   never silently regenerates one).
+#   model_seeds  -- VAE-ONLY. Seeds weight init, minibatch order, and latent
+#                   sampling. Has NO effect on which subjects land in
+#                   train/val. Five model_seeds -> five VAE runs on the
+#                   SAME split, so the median-across-model_seed summary
+#                   quantifies VAE TRAINING/init stability, not split
+#                   variability (which never changes).
+# Subject-level sampling uncertainty is evaluated separately later via
+# paired bootstrap; region-level uncertainty via permutation across the 25
+# regions -- neither is part of this split_seed/model_seeds mechanism.
+
+# ── data these baselines read ──────────────────────────────────────
+dataset:
+  raw_dir: data/GACRS/preprocessed_blocks/raw
+  block_def: data/GACRS/preprocessed_blocks/summary/block_raw_manifest.tsv
+  use_manifest_path: false   # trust manifest's raw_file column verbatim instead of <raw_dir>/<id>.raw
+
+# ── settings that MUST be identical for PCA and VAE to stay comparable ──
+shared:
+  split_seed: 42                        # the ONE fixed train/validation split (PCA fits once on it)
+  model_seeds: [42]      # VAE-only: init / minibatch order / latent sampling
+  val_frac: 0.20
+  k_range: [2, 3, 4, 5, 6, 8, 10]
+  save_per_block: false
+  run_clustering: false    # false skips GMM/KMeans on BOTH PCA and VAE (e.g. long-training diagnostics-only pilots)
+
+# ── PCA baseline (the linear floor) ─────────────────────────────────
+# Runs ONCE (deterministic given the split) into a FLAT output_root -- no
+# seed_<n> subdirectory, no median-across-seed aggregation (nothing varies
+# to aggregate). See per_block_PCA_concat.py.
+pca:
+  output_root: results/GACRS/baseline_pca
+  phase1_dir: null            # set to reuse an existing split instead of creating one from split_seed
+
+vae:
+  output_root: results/GACRS/baseline_vae
+  phase1_dir: results/GACRS/baseline_pca
+
+  loss_type: ORD
+  objective_mode: VAE
+
+  epochs: 1000
+  diagnostic_interval: 10
+  batch_size: 64
+  lr: 0.001
+  dropout: 0.30
+  patience: 20
+  grad_clip: 1.0
+  checkpoint_start_epoch: 51
+
+  active_var_threshold: 0.01
+  collapse_active_dims_threshold: 0
+  maf_bins: [0.0, 0.05, 0.10, 0.20, 0.50]
+
+  beta_max: 0.5
+  beta_warmup: 50
+  free_bits: 0.5
+
+  sensitivity:
+    enabled: false
+    dry_run: false
+    mode: one_at_a_time
+
+    reference:
+      beta_max: 0.5
+      free_bits: 0.5
+      objective_mode: VAE
+
+    beta_values: [0.1, 0.5, 1.0]
+    free_bits_values: [0.0, 0.5, 1.0]
+    include_ae: true
